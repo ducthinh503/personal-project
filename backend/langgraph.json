@@ -1,0 +1,14 @@
+{
+  "graphs": {
+    "supervisor-raw": "main:supervisor_graph"
+  },
+  "dependencies": [
+    "langgraph==0.6.7",
+    "langgraph-prebuilt==0.6.4",
+    "langchain==0.3.27",
+    "langchain-openai==0.3.32",
+    "deepagents==0.0.5",
+    "tavily-python==0.7.11",
+    "python-dotenv==1.1.1"
+  ]
+}
