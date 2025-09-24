@@ -1,0 +1,23 @@
+
+@"
+# --- Python ---
+.venv/
+backend/.venv/
+__pycache__/
+*.pyc
+
+# --- Node/Next.js ---
+frontend/node_modules/
+frontend/.next/
+frontend/.turbo/
+frontend/.vercel/
+
+# --- Env / secrets ---
+.env
+.env.*
+backend/.env
+
+# --- OS junk ---
+.DS_Store
+Thumbs.db
+"@ | Set-Content .gitignore
