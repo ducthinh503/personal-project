@@ -16,61 +16,49 @@ interface ChatMessageProps {
   showAvatar: boolean;
   onSelectSubAgent: (subAgent: SubAgent) => void;
   selectedSubAgent: SubAgent | null;
+  /** NEW: dùng để dừng đồng hồ trong ToolCallBox khi stream kết thúc */
+  isStreaming?: boolean;
 }
 
 export const ChatMessage = React.memo<ChatMessageProps>(
-  ({ message, toolCalls, showAvatar, onSelectSubAgent, selectedSubAgent }) => {
+  ({
+    message,
+    toolCalls,
+    showAvatar,
+    onSelectSubAgent,
+    selectedSubAgent,
+    isStreaming, // <- NEW
+  }) => {
     const isUser = message.type === "human";
     const messageContent = extractStringFromMessageContent(message);
-    const hasContent = messageContent && messageContent.trim() !== "";
+    const hasContent = !!messageContent && messageContent.trim() !== "";
     const hasToolCalls = toolCalls.length > 0;
-    const subAgents = useMemo(() => {
+
+    // Gom các "task" subagents (nếu có) để hiển thị badges
+    const subAgents = useMemo<SubAgent[]>(() => {
       return toolCalls
-        .filter((toolCall: ToolCall) => {
-          return (
-            toolCall.name === "task" &&
-            toolCall.args["subagent_type"] &&
-            toolCall.args["subagent_type"] !== "" &&
-            toolCall.args["subagent_type"] !== null
-          );
-        })
-        .map((toolCall: ToolCall) => {
-          return {
-            id: toolCall.id,
-            name: toolCall.name,
-            subAgentName: toolCall.args["subagent_type"],
-            input: toolCall.args["description"],
-            output: toolCall.result,
-            status: toolCall.status,
-          };
-        });
+        .filter((tc) => tc.name === "task" && tc.args?.subagent_type)
+        .map((tc) => ({
+          id: tc.id,
+          name: tc.name,
+          subAgentName: tc.args["subagent_type"],
+          input: tc.args["description"],
+          output: tc.result,
+          status: tc.status,
+        }));
     }, [toolCalls]);
 
-    const subAgentsString = useMemo(() => {
-      return JSON.stringify(subAgents);
-    }, [subAgents]);
-
+    // Duy trì lựa chọn subAgent nếu đang chọn
+    const subAgentsString = useMemo(() => JSON.stringify(subAgents), [subAgents]);
     useEffect(() => {
-      if (
-        subAgents.some(
-          (subAgent: SubAgent) => subAgent.id === selectedSubAgent?.id,
-        )
-      ) {
-        onSelectSubAgent(
-          subAgents.find(
-            (subAgent: SubAgent) => subAgent.id === selectedSubAgent?.id,
-          )!,
-        );
-      }
-    }, [selectedSubAgent, onSelectSubAgent, subAgentsString]);
+      const found = subAgents.find((s) => s.id === selectedSubAgent?.id);
+      if (found) onSelectSubAgent(found);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedSubAgent, subAgentsString]);
 
     return (
-      <div
-        className={`${styles.message} ${isUser ? styles.user : styles.assistant}`}
-      >
-        <div
-          className={`${styles.avatar} ${!showAvatar ? styles.avatarHidden : ""}`}
-        >
+      <div className={`${styles.message} ${isUser ? styles.user : styles.assistant}`}>
+        <div className={`${styles.avatar} ${!showAvatar ? styles.avatarHidden : ""}`}>
           {showAvatar &&
             (isUser ? (
               <User className={styles.avatarIcon} />
@@ -78,6 +66,7 @@ export const ChatMessage = React.memo<ChatMessageProps>(
               <Bot className={styles.avatarIcon} />
             ))}
         </div>
+
         <div className={styles.content}>
           {hasContent && (
             <div className={styles.bubble}>
@@ -88,21 +77,30 @@ export const ChatMessage = React.memo<ChatMessageProps>(
               )}
             </div>
           )}
+
           {hasToolCalls && (
             <div className={styles.toolCalls}>
-              {toolCalls.map((toolCall: ToolCall) => {
-                if (toolCall.name === "task") return null;
-                return <ToolCallBox key={toolCall.id} toolCall={toolCall} />;
+              {toolCalls.map((tc) => {
+                if (tc.name === "task") return null; // không render task ở khối ToolCall
+                return (
+                  <ToolCallBox
+                    key={tc.id}
+                    toolCall={tc}
+                    /** NEW: truyền cờ streaming xuống box để chốt timer đúng lúc */
+                    isStreaming={isStreaming}
+                  />
+                );
               })}
             </div>
           )}
+
           {!isUser && subAgents.length > 0 && (
             <div className={styles.subAgents}>
-              {subAgents.map((subAgent: SubAgent) => (
+              {subAgents.map((sa) => (
                 <SubAgentIndicator
-                  key={subAgent.id}
-                  subAgent={subAgent}
-                  onClick={() => onSelectSubAgent(subAgent)}
+                  key={sa.id}
+                  subAgent={sa}
+                  onClick={() => onSelectSubAgent(sa)}
                 />
               ))}
             </div>
@@ -110,7 +108,7 @@ export const ChatMessage = React.memo<ChatMessageProps>(
         </div>
       </div>
     );
-  },
+  }
 );
 
 ChatMessage.displayName = "ChatMessage";

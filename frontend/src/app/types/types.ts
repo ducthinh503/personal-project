@@ -4,6 +4,9 @@ export interface ToolCall {
   args: any;
   result?: string;
   status: "pending" | "completed" | "error";
+  startedAt?: number;  
+  elapsedMs?: number;  
+  doneAt?: number;
 }
 
 export interface SubAgent {

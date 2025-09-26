@@ -1,4 +1,4 @@
-// frontend/src/app/components/hooks/useChat.ts
+// frontend/src/app/hooks/useChat.ts
 import { useCallback, useMemo } from "react";
 import { useStream } from "@langchain/langgraph-sdk/react";
 import type { Message } from "@langchain/langgraph-sdk";
@@ -10,11 +10,12 @@ import { createClient } from "@/lib/client";
 import { useAuthContext } from "@/providers/Auth";
 
 type GraphState = {
-  // state bạn muốn nhận lại từ server
+  // những field server có thể stream trả về
   messages?: Message[];
   todos?: TodoItem[];
   files?: Record<string, string>;
-  // THÊM: để submit { input: string } không bị lỗi kiểu
+
+  // để submit { input: string } không lỗi kiểu
   input?: string;
 };
 
@@ -26,31 +27,29 @@ export function useChat(
   onTodosUpdate: (todos: TodoItem[]) => void,
   onFilesUpdate: (files: Record<string, string>) => void,
 ) {
-  const deployment = useMemo(() => getDeployment(), []);
   const { session } = useAuthContext();
   const accessToken = session?.accessToken ?? "";
 
   const assistantId = useMemo(() => {
-    if (!deployment?.agentId) {
-      throw new Error("No agent ID configured in environment");
-    }
-    return deployment.agentId;
-  }, [deployment]);
+    const dep = getDeployment();
+    if (!dep?.agentId) throw new Error("No agent ID configured in environment");
+    return dep.agentId;
+  }, []);
 
   const stream = useStream<GraphState>({
     assistantId,
     client: createClient(accessToken),
     reconnectOnMount: true,
     threadId: threadId ?? undefined,
-    onThreadId: setThreadId, // server tạo thread mới => cập nhật URL
+    onThreadId: setThreadId, // khi server tạo thread mới, cập nhật URL
     defaultHeaders: { "x-auth-scheme": "langsmith" },
 
-    // nhận partial state từ server (nếu có) để cập nhật sidebar
+    // nhận partial state từ server để cập nhật sidebar
     onUpdateEvent: (updates) => {
-      Object.values(updates).forEach((u) => {
+      for (const u of Object.values(updates)) {
         if (u?.todos) onTodosUpdate(u.todos);
         if (u?.files) onFilesUpdate(u.files);
-      });
+      }
     },
   });
 
@@ -58,11 +57,10 @@ export function useChat(
     (text: string) => {
       const human: Message = { id: uuidv4(), type: "human", content: text };
 
-      // ✅ backend (main.py) đang đọc state["input"] (string)
       stream.submit(
         { input: text } as any,
         {
-          // show ngay bubble của user
+          // hiển thị ngay bubble của user
           optimisticValues(prev) {
             const prevMsgs = (prev.messages ?? []) as Message[];
             return { ...prev, messages: [...prevMsgs, human] };
